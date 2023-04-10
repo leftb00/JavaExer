@@ -9,21 +9,27 @@ import java.util.concurrent.Executors;
 
 public class EchoServer
 {
-	private AsynchronousServerSocketChannel serverChannel;
-	private ExecutorService executorService = Executors.newFixedThreadPool(10);
+	private AsynchronousServerSocketChannel serverChannel_;
+	private ExecutorService executorService_;
+	//private int poolSize_;
 
-	public void start(int port) throws IOException
+	public EchoServer(int port, int poolSize) throws IOException
 	{
-		serverChannel = AsynchronousServerSocketChannel.open();
-		serverChannel.bind(new InetSocketAddress(port));
-		serverChannel.accept(null, new CompletionHandler<AsynchronousSocketChannel, Void>()
+		//this.poolSize_ = poolSize;
+		serverChannel_ = AsynchronousServerSocketChannel.open();
+		serverChannel_.bind(new InetSocketAddress(port));
+		executorService_ = Executors.newFixedThreadPool(poolSize);
+	}
+
+	public void start()
+	{
+		serverChannel_.accept(null, new CompletionHandler<AsynchronousSocketChannel, Void>()
 		{
 			@Override
-			public void completed(AsynchronousSocketChannel clientChannel, Void attachment)
+			public void completed(AsynchronousSocketChannel clientChannel_, Void attachment)
 			{
-				serverChannel.accept(null, this);
-				executorService.submit(
-						new SocketHandlerRunnable(new SocketHandler(clientChannel)));
+				serverChannel_.accept(null, this);
+				executorService_.submit(new SocketHandler(clientChannel_));
 			}
 
 			@Override
@@ -36,14 +42,14 @@ public class EchoServer
 
 	public static void main(String[] args) throws IOException
 	{
-		EchoServer server = new EchoServer();
-		server.start(8080);
+		EchoServer server = new EchoServer(8080, 10);
+		server.start();
 	}
 
-	private static class SocketHandler implements CompletionHandler<Integer, ByteBuffer>
+	private class SocketHandler implements Runnable
 	{
-		private final AsynchronousSocketChannel clientChannel_;
-		private final ByteBuffer buffer_;
+		private AsynchronousSocketChannel clientChannel_;
+		private ByteBuffer buffer_;
 
 		public SocketHandler(AsynchronousSocketChannel clientChannel)
 		{
@@ -52,61 +58,50 @@ public class EchoServer
 		}
 
 		@Override
-		public void completed(Integer result, ByteBuffer attachment)
+		public void run()
 		{
-			if (result == -1)
+			clientChannel_.read(buffer_, buffer_, new CompletionHandler<Integer, ByteBuffer>()
 			{
-				try
+				@Override
+				public void completed(Integer result, ByteBuffer attachment)
 				{
-					clientChannel_.close();
+					if (result == -1)
+					{
+						try
+						{
+							clientChannel_.close();
+						}
+						catch (IOException e)
+						{
+							// handle exception
+						}
+						return;
+					}
+
+					if (result > 0)
+					{
+						attachment.flip();
+						String message = new String(attachment.array(), 0, result);
+						System.out.println("Received from client: " + message);
+
+						String response = message.toUpperCase();
+						attachment.clear();
+						attachment.put(response.getBytes());
+						attachment.flip();
+
+						clientChannel_.write(attachment, attachment, this);
+					}
+
+					attachment.clear();
+					clientChannel_.read(attachment, attachment, this);
 				}
-				catch (IOException e)
+
+				@Override
+				public void failed(Throwable exc, ByteBuffer attachment)
 				{
 					// handle exception
 				}
-				return;
-			}
-
-			if (result > 0)
-			{
-				attachment.flip();
-				String message = new String(attachment.array(), 0, result);
-				System.out.println("Received from client: " + message);
-
-				String response = message.toUpperCase();
-				attachment.clear();
-				attachment.put(response.getBytes());
-				attachment.flip();
-
-				clientChannel_.write(attachment, attachment, this);
-			}
-
-			attachment.clear();
-			clientChannel_.read(attachment, attachment, this);
-		}
-
-		@Override
-		public void failed(Throwable exc, ByteBuffer attachment) {
-			// handle exception
-		}
-	}
-
-	private static class SocketHandlerRunnable implements Runnable
-	{
-		private final SocketHandler socketHandler_;
-
-		public SocketHandlerRunnable(SocketHandler socketHandler)
-		{
-			socketHandler_ = socketHandler;
-		}
-
-		@Override
-		public void run()
-		{
-			socketHandler_.clientChannel_.read(
-					socketHandler_.buffer_,
-					socketHandler_.buffer_,
-					socketHandler_);
+			});
 		}
 	}
 }
