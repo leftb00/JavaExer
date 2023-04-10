@@ -22,7 +22,8 @@ public class EchoServer
 			public void completed(AsynchronousSocketChannel clientChannel, Void attachment)
 			{
 				serverChannel.accept(null, this);
-				executorService.submit(new SocketHandler(clientChannel));
+				executorService.submit(
+						new SocketHandlerRunnable(new SocketHandler(clientChannel)));
 			}
 
 			@Override
@@ -41,13 +42,13 @@ public class EchoServer
 
 	private static class SocketHandler implements CompletionHandler<Integer, ByteBuffer>
 	{
-		private final AsynchronousSocketChannel clientChannel;
-		private final ByteBuffer buffer;
+		private final AsynchronousSocketChannel clientChannel_;
+		private final ByteBuffer buffer_;
 
 		public SocketHandler(AsynchronousSocketChannel clientChannel)
 		{
-			this.clientChannel = clientChannel;
-			buffer = ByteBuffer.allocate(1024);
+			clientChannel_ = clientChannel;
+			buffer_ = ByteBuffer.allocate(1024);
 		}
 
 		@Override
@@ -57,7 +58,7 @@ public class EchoServer
 			{
 				try
 				{
-					clientChannel.close();
+					clientChannel_.close();
 				}
 				catch (IOException e)
 				{
@@ -77,16 +78,35 @@ public class EchoServer
 				attachment.put(response.getBytes());
 				attachment.flip();
 
-				clientChannel.write(attachment, attachment, this);
+				clientChannel_.write(attachment, attachment, this);
 			}
 
 			attachment.clear();
-			clientChannel.read(attachment, attachment, this);
+			clientChannel_.read(attachment, attachment, this);
 		}
 
 		@Override
 		public void failed(Throwable exc, ByteBuffer attachment) {
 			// handle exception
+		}
+	}
+
+	private static class SocketHandlerRunnable implements Runnable
+	{
+		private final SocketHandler socketHandler_;
+
+		public SocketHandlerRunnable(SocketHandler socketHandler)
+		{
+			socketHandler_ = socketHandler;
+		}
+
+		@Override
+		public void run()
+		{
+			socketHandler_.clientChannel_.read(
+					socketHandler_.buffer_,
+					socketHandler_.buffer_,
+					socketHandler_);
 		}
 	}
 }
