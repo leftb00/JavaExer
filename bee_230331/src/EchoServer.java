@@ -26,10 +26,10 @@ public class EchoServer
 		serverChannel_.accept(null, new CompletionHandler<AsynchronousSocketChannel, Void>()
 		{
 			@Override
-			public void completed(AsynchronousSocketChannel clientChannel_, Void attachment)
+			public void completed(AsynchronousSocketChannel clientChannel, Void attachment)
 			{
 				serverChannel_.accept(null, this);
-				executorService_.submit(new SocketHandler(clientChannel_));
+				executorService_.submit(new SocketHandler(clientChannel));
 			}
 
 			@Override
