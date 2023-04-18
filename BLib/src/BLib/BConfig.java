@@ -26,7 +26,7 @@ public class BConfig
             	line = line.trim();
             	if(!line.isEmpty() && !line.trim().startsWith("#"))
             	{
-                	String[] parts = line.split("=", 2);
+                	String[] parts = line.split(":", 2);
                 	if(parts.length == 2)
                         config_.put(parts[0].trim(), parts[1].split("#")[0].trim());
             	}
