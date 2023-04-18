@@ -112,9 +112,9 @@ public class BLogger
 
 		try
 		{
+			Files.createFile(logFilePath);
 			currentLogFilePath_ = logFilePath;
 			currentLogDate_ = logDate;
-			Files.createFile(currentLogFilePath_);
 		}
 		catch (IOException e)
 		{
